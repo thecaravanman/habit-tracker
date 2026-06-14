@@ -307,6 +307,77 @@
       flex-shrink: 0;
     }
     .done-check svg { width: 12px; height: 12px; }
+
+    /* Settings button */
+    .header-btns { display: flex; gap: 8px; align-items: center; }
+    .icon-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 1rem;
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+    .icon-btn.active { color: var(--accent); border-color: var(--accent); }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      width: min(480px, calc(100vw - 32px));
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    }
+    .modal h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    .modal .modal-sub { font-size: 0.8rem; color: var(--muted); margin-bottom: 24px; line-height: 1.5; }
+    .modal .modal-sub a { color: var(--accent); }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .field input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .field input:focus { border-color: var(--accent); }
+    .field .hint { font-size: 0.74rem; color: var(--muted); margin-top: 5px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
+    .btn-test { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
+    .btn-primary { background: var(--accent); color: #fff; flex: 1; text-align: center; }
+    .test-status { font-size: 0.8rem; color: var(--muted); flex: 1; }
+    .test-status.ok { color: var(--accent4); }
+    .test-status.err { color: var(--accent3); }
+
+    /* Obsidian sync indicator on diary */
+    .obsidian-status {
+      font-size: 0.74rem;
+      margin-top: 6px;
+      min-height: 18px;
+      color: var(--muted);
+    }
+    .obsidian-status.synced { color: var(--accent4); }
+    .obsidian-status.error { color: var(--accent3); }
+    .obsidian-status.syncing { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -316,8 +387,36 @@
     <h1>Daily Habits</h1>
     <div class="date" id="headerDate"></div>
   </div>
-  <button class="reset-btn" id="resetBtn">Reset Day</button>
+  <div class="header-btns">
+    <button class="icon-btn" id="settingsBtn" title="Obsidian settings">⚙️</button>
+    <button class="reset-btn" id="resetBtn">Reset Day</button>
+  </div>
 </header>
+
+<!-- Obsidian Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>Obsidian Sync</h2>
+    <p class="modal-sub">
+      Install the <strong>Local REST API</strong> community plugin in Obsidian, then paste your API key below.<br>
+      After saving, visit <strong>https://localhost:27124</strong> in this browser once to accept the certificate.
+    </p>
+    <div class="field">
+      <label>API Key</label>
+      <input type="password" id="obsApiKey" placeholder="Paste your API key from the plugin settings…">
+    </div>
+    <div class="field">
+      <label>Folder in Vault</label>
+      <input type="text" id="obsFolder" placeholder="Journal/French">
+      <div class="hint">Notes will be saved as <em>YYYY-MM-DD.md</em> inside this folder.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-test" onclick="testObsidian()">Test Connection</button>
+      <span class="test-status" id="testStatus"></span>
+      <button class="btn btn-primary" onclick="saveObsidianSettings()">Save</button>
+    </div>
+  </div>
+</div>
 
 <div class="progress-bar-wrap">
   <div class="progress-meta">
@@ -428,6 +527,7 @@ function buildHabits() {
           <div class="diary-save-row">
             <button class="btn btn-save" id="saveBtn-${h.id}" onclick="saveDiary('${h.id}')">Save Entry</button>
           </div>
+          <div class="obsidian-status" id="obsStatus-${h.id}"></div>
         </div>
       ` : ''}
     `;
@@ -499,7 +599,59 @@ function toggleDone(id) {
   renderStreak();
 }
 
-function saveDiary(id) {
+function loadObsSettings() {
+  try { return JSON.parse(localStorage.getItem('obsSettings') || '{}'); } catch { return {}; }
+}
+function saveObsidianSettings() {
+  const key = document.getElementById('obsApiKey').value.trim();
+  const folder = document.getElementById('obsFolder').value.trim() || 'Journal/French';
+  localStorage.setItem('obsSettings', JSON.stringify({ key, folder }));
+  closeSettings();
+}
+function openSettings() {
+  const s = loadObsSettings();
+  document.getElementById('obsApiKey').value = s.key || '';
+  document.getElementById('obsFolder').value = s.folder || 'Journal/French';
+  document.getElementById('testStatus').textContent = '';
+  document.getElementById('settingsModal').classList.add('open');
+  document.getElementById('settingsBtn').classList.add('active');
+}
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+  document.getElementById('settingsBtn').classList.remove('active');
+}
+async function testObsidian() {
+  const s = loadObsSettings();
+  const key = document.getElementById('obsApiKey').value.trim() || s.key;
+  const el = document.getElementById('testStatus');
+  if (!key) { el.textContent = 'Enter an API key first.'; el.className = 'test-status err'; return; }
+  el.textContent = 'Testing…'; el.className = 'test-status';
+  try {
+    const res = await fetch('https://localhost:27124/', { headers: { 'Authorization': 'Bearer ' + key } });
+    if (res.ok) { el.textContent = '✓ Connected to Obsidian'; el.className = 'test-status ok'; }
+    else { el.textContent = `Error ${res.status} — check your API key`; el.className = 'test-status err'; }
+  } catch {
+    el.textContent = 'Could not reach Obsidian. Is it open? Visit https://localhost:27124 to accept the certificate first.';
+    el.className = 'test-status err';
+  }
+}
+
+async function pushToObsidian(content, date) {
+  const s = loadObsSettings();
+  if (!s.key) return null;
+  const folder = (s.folder || 'Journal/French').replace(/\/$/, '');
+  const path = `${folder}/${date}.md`;
+  const body = `# French Practice — ${date}\n\n${content}\n\n---\n*Saved from Habit Tracker*`;
+  const res = await fetch(`https://localhost:27124/vault/${encodeURIComponent(path)}`, {
+    method: 'PUT',
+    headers: { 'Authorization': 'Bearer ' + s.key, 'Content-Type': 'text/markdown' },
+    body,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return path;
+}
+
+async function saveDiary(id) {
   const rec = getTodayRecord();
   const ta = document.getElementById('diary-' + id);
   rec.diary = ta ? ta.value : '';
@@ -509,6 +661,18 @@ function saveDiary(id) {
   if (btn) { btn.textContent = 'Saved!'; btn.classList.add('saved'); setTimeout(() => { btn.textContent = 'Save Entry'; btn.classList.remove('saved'); }, 1500); }
   updateProgress();
   renderStreak();
+
+  const statusEl = document.getElementById('obsStatus-' + id);
+  if (!statusEl) return;
+  const s = loadObsSettings();
+  if (!s.key || !rec.diary.trim()) return;
+  statusEl.textContent = 'Syncing to Obsidian…'; statusEl.className = 'obsidian-status syncing';
+  try {
+    const path = await pushToObsidian(rec.diary, todayKey());
+    statusEl.textContent = `✓ Saved to Obsidian: ${path}`; statusEl.className = 'obsidian-status synced';
+  } catch (e) {
+    statusEl.textContent = `Obsidian sync failed: ${e.message}`; statusEl.className = 'obsidian-status error';
+  }
 }
 
 function updateProgress() {
@@ -579,6 +743,9 @@ function setHeaderDate() {
   const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   document.getElementById('headerDate').textContent = now.toLocaleDateString('en-GB', opts);
 }
+
+document.getElementById('settingsBtn').addEventListener('click', openSettings);
+document.getElementById('settingsModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSettings(); });
 
 document.getElementById('resetBtn').addEventListener('click', () => {
   if (!confirm('Reset today\'s progress? This cannot be undone.')) return;
