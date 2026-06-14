@@ -630,8 +630,12 @@ async function testObsidian() {
     const res = await fetch('https://localhost:27124/', { headers: { 'Authorization': 'Bearer ' + key } });
     if (res.ok) { el.textContent = '✓ Connected to Obsidian'; el.className = 'test-status ok'; }
     else { el.textContent = `Error ${res.status} — check your API key`; el.className = 'test-status err'; }
-  } catch {
-    el.textContent = 'Could not reach Obsidian. Is it open? Visit https://localhost:27124 to accept the certificate first.';
+  } catch (e) {
+    if (e instanceof TypeError) {
+      el.innerHTML = 'Could not reach Obsidian. Is it open? You may need to <a href="https://localhost:27124" target="_blank" style="color:var(--accent)">accept the certificate</a> first, then try again.';
+    } else {
+      el.textContent = `Error: ${e.message}`;
+    }
     el.className = 'test-status err';
   }
 }
@@ -641,8 +645,10 @@ async function pushToObsidian(content, date) {
   if (!s.key) return null;
   const folder = (s.folder || 'Journal/French').replace(/\/$/, '');
   const path = `${folder}/${date}.md`;
+  // encode each segment individually so slashes are preserved in the URL
+  const encodedPath = path.split('/').map(encodeURIComponent).join('/');
   const body = `# French Practice — ${date}\n\n${content}\n\n---\n*Saved from Habit Tracker*`;
-  const res = await fetch(`https://localhost:27124/vault/${encodeURIComponent(path)}`, {
+  const res = await fetch(`https://localhost:27124/vault/${encodedPath}`, {
     method: 'PUT',
     headers: { 'Authorization': 'Bearer ' + s.key, 'Content-Type': 'text/markdown' },
     body,
@@ -671,7 +677,12 @@ async function saveDiary(id) {
     const path = await pushToObsidian(rec.diary, todayKey());
     statusEl.textContent = `✓ Saved to Obsidian: ${path}`; statusEl.className = 'obsidian-status synced';
   } catch (e) {
-    statusEl.textContent = `Obsidian sync failed: ${e.message}`; statusEl.className = 'obsidian-status error';
+    if (e instanceof TypeError) {
+      statusEl.innerHTML = 'Obsidian unreachable — open <a href="https://localhost:27124" target="_blank" style="color:var(--accent)">https://localhost:27124</a> in this browser, accept the certificate, then save again.';
+    } else {
+      statusEl.textContent = `Obsidian sync failed: ${e.message}`;
+    }
+    statusEl.className = 'obsidian-status error';
   }
 }
 
