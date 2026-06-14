@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Habit Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a24;
+      --surface2: #22222f;
+      --border: #2e2e40;
+      --accent: #7c6fcd;
+      --accent2: #5eabd0;
+      --accent3: #e07b5a;
+      --accent4: #5ec47a;
+      --accent5: #d0a95e;
+      --text: #e8e8f0;
+      --muted: #7a7a96;
+      --timer-ring: #7c6fcd;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px 16px 48px;
+    }
+
+    header {
+      max-width: 720px;
+      margin: 0 auto 32px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .header-left h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .header-left .date {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .reset-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .reset-btn:hover { color: var(--text); border-color: var(--accent); }
+
+    .progress-bar-wrap {
+      max-width: 720px;
+      margin: 0 auto 28px;
+    }
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .progress-track {
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 99px;
+      transition: width 0.4s cubic-bezier(.4,0,.2,1);
+      width: 0%;
+    }
+
+    .habits {
+      max-width: 720px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .habit-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 22px;
+      transition: border-color 0.2s;
+    }
+    .habit-card.done {
+      border-color: var(--accent4);
+      background: color-mix(in srgb, var(--surface) 85%, var(--accent4) 15%);
+    }
+    .habit-card.diary-card { border-radius: 16px; }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .habit-icon {
+      font-size: 1.6rem;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface2);
+      border-radius: 12px;
+      flex-shrink: 0;
+    }
+
+    .habit-info { flex: 1; min-width: 0; }
+
+    .habit-name {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .habit-target {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .card-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .timer-display {
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+      min-width: 54px;
+      text-align: right;
+    }
+    .habit-card.done .timer-display { color: var(--accent4); }
+
+    .btn {
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 7px 14px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.96); }
+
+    .btn-timer {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-timer.running { background: var(--accent3); }
+    .btn-timer:disabled { opacity: 0.35; cursor: default; }
+
+    .btn-done {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .habit-card.done .btn-done {
+      background: var(--accent4);
+      border-color: var(--accent4);
+      color: #fff;
+    }
+
+    /* SVG ring timer */
+    .ring-wrap {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+    }
+    .ring-wrap svg {
+      position: absolute;
+      top: 0; left: 0;
+      transform: rotate(-90deg);
+    }
+    .ring-bg { fill: none; stroke: var(--surface2); stroke-width: 3; }
+    .ring-fill { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+    .habit-card.done .ring-fill { stroke: var(--accent4); }
+
+    /* Diary section */
+    .diary-section {
+      margin-top: 16px;
+    }
+    .diary-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .diary-textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      padding: 12px 14px;
+      resize: vertical;
+      min-height: 100px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .diary-textarea:focus { border-color: var(--accent); }
+    .diary-textarea::placeholder { color: var(--muted); }
+    .diary-save-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+    }
+    .btn-save {
+      background: var(--accent);
+      color: #fff;
+      padding: 7px 18px;
+    }
+    .btn-save.saved { background: var(--accent4); }
+
+    /* Streak calendar */
+    .streak-section {
+      max-width: 720px;
+      margin: 32px auto 0;
+    }
+    .streak-section h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-size: 0.78rem;
+    }
+    .streak-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .streak-day {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.62rem;
+      color: var(--muted);
+      position: relative;
+      cursor: default;
+    }
+    .streak-day.partial { background: color-mix(in srgb, var(--surface2) 60%, var(--accent) 40%); border-color: var(--accent); }
+    .streak-day.complete { background: var(--accent4); border-color: var(--accent4); color: #fff; }
+    .streak-day.today { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stat-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 16px;
+      flex: 1;
+      text-align: center;
+    }
+    .stat-chip .val { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+    .stat-chip .lbl { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+    .done-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .done-check svg { width: 12px; height: 12px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Daily Habits</h1>
+    <div class="date" id="headerDate"></div>
+  </div>
+  <button class="reset-btn" id="resetBtn">Reset Day</button>
+</header>
+
+<div class="progress-bar-wrap">
+  <div class="progress-meta">
+    <span id="progressLabel">0 of 5 complete</span>
+    <span id="progressPct">0%</span>
+  </div>
+  <div class="progress-track">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+</div>
+
+<div class="habits" id="habitsContainer"></div>
+
+<div class="streak-section">
+  <div class="stats-row" id="statsRow"></div>
+  <h2>Last 30 Days</h2>
+  <div class="streak-grid" id="streakGrid"></div>
+</div>
+
+<script>
+const HABITS = [
+  { id: 'chemistry', name: 'Chemistry Study', icon: '🧪', minutes: 45, color: '#7c6fcd' },
+  { id: 'trumpet',   name: 'Trumpet Practice', icon: '🎺', minutes: 30, color: '#e07b5a' },
+  { id: 'fhorn',     name: 'French Horn Practice', icon: '🎵', minutes: 30, color: '#d0a95e' },
+  { id: 'french',    name: 'French Practice', icon: '🇫🇷', minutes: null, diary: true, color: '#5eabd0' },
+  { id: 'maths',     name: 'Maths Practice', icon: '📐', minutes: 30, color: '#5ec47a' },
+];
+
+const todayKey = () => new Date().toISOString().slice(0, 10);
+
+function loadData() {
+  try { return JSON.parse(localStorage.getItem('habitData') || '{}'); } catch { return {}; }
+}
+function saveData(data) {
+  localStorage.setItem('habitData', JSON.stringify(data));
+}
+
+let data = loadData();
+let timers = {};
+
+function getTodayRecord() {
+  const key = todayKey();
+  if (!data[key]) data[key] = { done: {}, diary: '', elapsed: {} };
+  if (!data[key].elapsed) data[key].elapsed = {};
+  return data[key];
+}
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = (seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function buildHabits() {
+  const container = document.getElementById('habitsContainer');
+  const rec = getTodayRecord();
+  container.innerHTML = '';
+
+  HABITS.forEach(h => {
+    const done = !!rec.done[h.id];
+    const elapsed = rec.elapsed[h.id] || 0;
+    const total = h.minutes ? h.minutes * 60 : null;
+    const remaining = total ? Math.max(0, total - elapsed) : null;
+
+    const card = document.createElement('div');
+    card.className = 'habit-card' + (done ? ' done' : '') + (h.diary ? ' diary-card' : '');
+    card.id = 'card-' + h.id;
+
+    const R = 18;
+    const C = 2 * Math.PI * R;
+    const frac = total ? Math.min(1, elapsed / total) : 0;
+
+    card.innerHTML = `
+      <div class="card-top">
+        ${total ? `
+        <div class="ring-wrap">
+          <svg width="44" height="44" viewBox="0 0 44 44">
+            <circle class="ring-bg" cx="22" cy="22" r="${R}"/>
+            <circle class="ring-fill" id="ring-${h.id}" cx="22" cy="22" r="${R}"
+              stroke-dasharray="${C}"
+              stroke-dashoffset="${C - frac * C}"
+            />
+          </svg>
+          <div class="habit-icon" style="position:absolute;top:0;left:0;background:transparent;">${h.icon}</div>
+        </div>
+        ` : `<div class="habit-icon">${h.icon}</div>`}
+        <div class="habit-info">
+          <div class="habit-name">${h.name}</div>
+          <div class="habit-target">${h.minutes ? `${h.minutes} min target` : 'Diary entry'}</div>
+        </div>
+        <div class="card-actions">
+          ${total ? `
+            <div class="timer-display" id="timer-${h.id}">${formatTime(remaining)}</div>
+            <button class="btn btn-timer${timers[h.id] ? ' running' : ''}" id="timerBtn-${h.id}"
+              onclick="toggleTimer('${h.id}')" ${done ? 'disabled' : ''}>
+              ${timers[h.id] ? 'Pause' : (elapsed > 0 ? 'Resume' : 'Start')}
+            </button>
+          ` : ''}
+          <button class="btn btn-done" id="doneBtn-${h.id}" onclick="toggleDone('${h.id}')">
+            ${done ? '✓ Done' : 'Mark Done'}
+          </button>
+        </div>
+      </div>
+      ${h.diary ? `
+        <div class="diary-section">
+          <div class="diary-label">Today's French Diary</div>
+          <textarea class="diary-textarea" id="diary-${h.id}" placeholder="Write about what you practised in French today…">${rec.diary || ''}</textarea>
+          <div class="diary-save-row">
+            <button class="btn btn-save" id="saveBtn-${h.id}" onclick="saveDiary('${h.id}')">Save Entry</button>
+          </div>
+        </div>
+      ` : ''}
+    `;
+
+    container.appendChild(card);
+  });
+
+  updateProgress();
+}
+
+function toggleTimer(id) {
+  const rec = getTodayRecord();
+  if (timers[id]) {
+    clearInterval(timers[id]);
+    delete timers[id];
+    saveData(data);
+    document.getElementById('timerBtn-' + id).textContent = 'Resume';
+    document.getElementById('timerBtn-' + id).classList.remove('running');
+  } else {
+    const habit = HABITS.find(h => h.id === id);
+    const total = habit.minutes * 60;
+    timers[id] = setInterval(() => {
+      rec.elapsed[id] = (rec.elapsed[id] || 0) + 1;
+      const elapsed = rec.elapsed[id];
+      const remaining = Math.max(0, total - elapsed);
+      const frac = Math.min(1, elapsed / total);
+      const R = 18;
+      const C = 2 * Math.PI * R;
+
+      const timerEl = document.getElementById('timer-' + id);
+      const ringEl = document.getElementById('ring-' + id);
+      if (timerEl) timerEl.textContent = formatTime(remaining);
+      if (ringEl) ringEl.style.strokeDashoffset = C - frac * C;
+
+      if (remaining === 0) {
+        clearInterval(timers[id]);
+        delete timers[id];
+        const btn = document.getElementById('timerBtn-' + id);
+        if (btn) { btn.textContent = 'Done!'; btn.disabled = true; }
+        autoDone(id);
+      }
+      saveData(data);
+    }, 1000);
+
+    document.getElementById('timerBtn-' + id).textContent = 'Pause';
+    document.getElementById('timerBtn-' + id).classList.add('running');
+  }
+}
+
+function autoDone(id) {
+  const rec = getTodayRecord();
+  if (!rec.done[id]) {
+    rec.done[id] = true;
+    saveData(data);
+    buildHabits();
+    renderStreak();
+  }
+}
+
+function toggleDone(id) {
+  const rec = getTodayRecord();
+  rec.done[id] = !rec.done[id];
+  if (!rec.done[id] && timers[id]) {
+    clearInterval(timers[id]);
+    delete timers[id];
+  }
+  saveData(data);
+  buildHabits();
+  renderStreak();
+}
+
+function saveDiary(id) {
+  const rec = getTodayRecord();
+  const ta = document.getElementById('diary-' + id);
+  rec.diary = ta ? ta.value : '';
+  if (rec.diary.trim()) rec.done[id] = true;
+  saveData(data);
+  const btn = document.getElementById('saveBtn-' + id);
+  if (btn) { btn.textContent = 'Saved!'; btn.classList.add('saved'); setTimeout(() => { btn.textContent = 'Save Entry'; btn.classList.remove('saved'); }, 1500); }
+  updateProgress();
+  renderStreak();
+}
+
+function updateProgress() {
+  const rec = getTodayRecord();
+  const done = HABITS.filter(h => rec.done[h.id]).length;
+  const total = HABITS.length;
+  const pct = Math.round((done / total) * 100);
+  document.getElementById('progressLabel').textContent = `${done} of ${total} complete`;
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+function renderStreak() {
+  const grid = document.getElementById('streakGrid');
+  const statsRow = document.getElementById('statsRow');
+  const today = todayKey();
+  const days = [];
+
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0, 10));
+  }
+
+  let streak = 0;
+  let totalComplete = 0;
+
+  // calc current streak (going back from today)
+  for (let i = days.length - 1; i >= 0; i--) {
+    const rec = data[days[i]];
+    const doneCount = rec ? HABITS.filter(h => rec.done && rec.done[h.id]).length : 0;
+    if (doneCount === HABITS.length) { streak++; totalComplete++; }
+    else { if (days[i] !== today) break; }
+  }
+
+  // total complete days in last 30
+  let total30 = 0;
+  days.forEach(d => {
+    const rec = data[d];
+    const doneCount = rec ? HABITS.filter(h => rec.done && rec.done[h.id]).length : 0;
+    if (doneCount === HABITS.length) total30++;
+  });
+
+  statsRow.innerHTML = `
+    <div class="stat-chip"><div class="val">${streak}</div><div class="lbl">Day Streak</div></div>
+    <div class="stat-chip"><div class="val">${total30}</div><div class="lbl">Perfect Days (30d)</div></div>
+    <div class="stat-chip"><div class="val">${Math.round((total30/30)*100)}%</div><div class="lbl">Completion Rate</div></div>
+  `;
+
+  grid.innerHTML = '';
+  days.forEach(d => {
+    const rec = data[d];
+    const doneCount = rec ? HABITS.filter(h => rec.done && rec.done[h.id]).length : 0;
+    const isToday = d === today;
+    const complete = doneCount === HABITS.length;
+    const partial = doneCount > 0 && !complete;
+    const dayNum = parseInt(d.slice(8));
+    const el = document.createElement('div');
+    el.className = 'streak-day' + (complete ? ' complete' : partial ? ' partial' : '') + (isToday ? ' today' : '');
+    el.title = `${d}: ${doneCount}/${HABITS.length} habits`;
+    el.textContent = dayNum;
+    grid.appendChild(el);
+  });
+}
+
+function setHeaderDate() {
+  const now = new Date();
+  const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  document.getElementById('headerDate').textContent = now.toLocaleDateString('en-GB', opts);
+}
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Reset today\'s progress? This cannot be undone.')) return;
+  Object.values(timers).forEach(clearInterval);
+  timers = {};
+  const key = todayKey();
+  delete data[key];
+  saveData(data);
+  buildHabits();
+  renderStreak();
+});
+
+// Auto-reset at midnight
+function scheduleReset() {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const ms = midnight - now;
+  setTimeout(() => { buildHabits(); renderStreak(); scheduleReset(); }, ms);
+}
+
+setHeaderDate();
+buildHabits();
+renderStreak();
+scheduleReset();
+</script>
+</body>
+</html>
